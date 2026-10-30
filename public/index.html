@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventario de cartas Yu-Gi-Oh!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0e111d;--panel:#171b2e;--field:#0e111d;--ink:#e7eaf6;--muted:#9ba4c6;--line:#2b3253;--gold:#d9a83a;--mon:#e08a3c;--spell:#2bb89d;--trap:#d4609a;--accent:#4f61d6;--link:#b4bfff;--danger:#ff8a86}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif}
+h1,h2,.btn,dt,.qty,.ph{font-family:"Barlow Semi Condensed",sans-serif}
+header{background:#0a0c16;color:#fff;padding:20px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between;border-bottom:4px solid var(--gold)}
+h1{margin:0;font-size:1.7rem}
+.stats{display:flex;gap:20px;color:#c9d0e6}
+.stats b{color:#fff;font-size:1.3rem;margin-right:4px}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:24px}
+h2{margin:0 0 14px;font-size:1.3rem}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+input,select,textarea{font:inherit;color:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn:focus-visible,.tile:focus-visible,#lang-btn:focus-visible,.menu summary:focus-visible,.menu-list a:focus-visible{outline:3px solid #8fa0e8;outline-offset:1px}
+.grow{flex:1;min-width:200px}
+.btn{cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:8px 16px;border-radius:6px;font-size:1rem;font-weight:600}
+.btn.alt{background:transparent;color:var(--link);border-color:var(--line)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn.sm{padding:4px 10px;font-size:.9rem}
+.btn:disabled{opacity:.4;cursor:default}
+a.btn{display:inline-block;text-decoration:none;line-height:normal}
+.menu{position:relative}
+.menu summary{display:inline-block;list-style:none}
+.menu summary::-webkit-details-marker{display:none}
+.menu-list{position:absolute;right:0;top:calc(100% + 6px);z-index:10;min-width:250px;padding:6px;display:grid;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #0008}
+.menu-list a{display:grid;padding:8px 10px;border-radius:6px;color:var(--ink);text-decoration:none}
+.menu-list a:hover{background:#252c4d}
+.menu-list b{font-family:"Barlow Semi Condensed"}
+.menu-list small{color:var(--muted)}
+.msg{color:var(--muted);margin:10px 0 0;min-height:1.4em}
+#results,#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:14px}
+.res{border:1px solid var(--line);border-top:5px solid var(--mon);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;font-size:.9rem}
+.res.spell{border-top-color:var(--spell)}.res.trap{border-top-color:var(--trap)}
+.res img{width:100%;aspect-ratio:59/86;object-fit:cover;border-radius:4px;background:var(--bg)}
+.res strong{font-family:"Barlow Semi Condensed";line-height:1.2}
+.res span{color:var(--muted);font-size:.82rem}
+/* Cuadrícula del inventario */
+.tile{position:relative;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg);cursor:pointer;aspect-ratio:59/86;color:inherit}
+.tile:hover{border-color:var(--gold)}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{display:grid;place-items:center;height:100%;padding:10px;text-align:center;font-weight:600;color:var(--muted)}
+.qty{position:absolute;right:6px;bottom:6px;min-width:30px;height:30px;padding:0 8px;border-radius:999px;background:#0a0c16ee;color:var(--gold);border:2px solid var(--gold);display:grid;place-items:center;font-weight:700;font-size:1rem}
+.tag{display:inline-block;background:#252c4d;color:var(--link);border-radius:999px;padding:1px 10px;font-size:.82rem;margin:2px 4px 2px 0}
+.empty{color:var(--muted);padding:12px 0 0}
+/* Diálogos */
+dialog{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:12px;padding:0;width:min(460px,94vw);box-shadow:0 20px 60px #0006}
+dialog::backdrop{background:#000a}
+#det{width:min(720px,94vw)}
+dialog form,.det{padding:22px}
+dialog form{display:grid;gap:12px}
+dialog h2{margin:0}
+label{display:grid;gap:4px;font-size:.9rem;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.err{color:var(--danger);margin:0;min-height:1.2em}
+.field{display:grid;gap:4px;font-size:.9rem;color:var(--muted)}
+.lang{position:relative}
+#lang-btn{width:100%;display:flex;align-items:center;gap:8px;text-align:left;font:inherit;color:var(--ink);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--field);cursor:pointer}
+#lang-btn::after{content:"▾";margin-left:auto;color:var(--muted)}
+#lang-list{position:absolute;z-index:5;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;max-height:210px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px #0008}
+#lang-list[hidden]{display:none}
+#lang-list li{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--ink)}
+#lang-list li:hover{background:#252c4d}
+#lang-list li:focus-visible{outline:2px solid #8fa0e8;outline-offset:-2px;background:#252c4d}
+#lang-list li[aria-selected=true]{color:var(--gold)}
+.flag{width:20px;height:15px;object-fit:cover;border-radius:2px;flex:none;display:inline-block}
+.lg{display:flex;align-items:center;gap:8px}
+.det{display:grid;grid-template-columns:200px 1fr;gap:22px}
+.det img{width:100%;border-radius:8px;display:block}
+.det-info{display:grid;gap:10px;align-content:start;max-height:75vh;overflow:auto}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0}
+dt{color:var(--muted)}dd{margin:0}
+.note{margin:0;padding-left:10px;border-left:3px solid var(--gold)}
+.desc{margin:0;color:var(--muted);font-size:.92rem;white-space:pre-line}
+.step{display:flex;align-items:center;gap:10px;margin-right:auto}
+.step b{min-width:2ch;text-align:center;font-size:1.2rem}
+@media (max-width:560px){.det{grid-template-columns:1fr}.det-img{max-width:200px}}
+@media (prefers-reduced-motion:no-preference){.res,.tile{transition:transform .15s,border-color .15s}.res:hover,.tile:hover{transform:translateY(-2px)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Inventario de cartas Yu-Gi-Oh!</h1>
+  <div class="stats"><span><b id="s-rows">0</b>entradas</span><span><b id="s-copies">0</b>copias</span></div>
+  <div class="row">
+    <details class="menu" id="exp">
+      <summary class="btn alt">Exportar</summary>
+      <div class="menu-list">
+        <a href="/api/export?format=json" download><b>JSON</b><small>Copia completa del inventario</small></a>
+        <a href="/api/export?format=csv" download><b>CSV</b><small>Para Excel o Google Sheets</small></a>
+        <a href="/api/export?format=ydk" download><b>YDK</b><small>Solo los IDs, para EDOPro y simuladores</small></a>
+      </div>
+    </details>
+    <button class="btn alt" id="import">Importar</button>
+    <input type="file" id="file" accept=".json,.csv,.ydk" hidden>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>Buscar en YGOPRODeck</h2>
+    <form class="row" id="search-form">
+      <input class="grow" id="q" placeholder="Nombre de la carta, p. ej. Dark Magician" required>
+      <button class="btn">Buscar</button>
+    </form>
+    <p class="msg" id="search-msg"></p>
+    <div id="results"></div>
+  </section>
+
+  <section>
+    <h2>Mi inventario</h2>
+    <div class="row">
+      <input class="grow" id="filter" list="all-tags" placeholder="Filtrar por nombre, código de set o etiqueta">
+      <datalist id="all-tags"></datalist>
+      <button class="btn" id="new">Añadir manualmente</button>
+    </div>
+    <p class="msg" id="inv-msg"></p>
+    <div id="grid"></div>
+  </section>
+</main>
+
+<dialog id="imp">
+  <form method="dialog" id="imp-form">
+    <h2>Importar inventario</h2>
+    <p id="imp-text"></p>
+    <p class="err" id="imp-err" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn alt" id="imp-cancel">Cancelar</button>
+      <button type="button" class="btn" data-mode="add">Añadir al inventario</button>
+      <button type="button" class="btn danger" data-mode="replace">Reemplazar todo</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="det"><div class="det" id="det-body"></div></dialog>
+
+<dialog id="dlg">
+  <form id="card-form">
+    <h2 id="dlg-title">Añadir carta</h2>
+    <input type="hidden" id="f-id">
+    <label>Nombre<input id="f-name" required></label>
+    <div class="two">
+      <label>Código de set<input id="f-set" list="sets" placeholder="LOB-EN005"></label>
+      <label>Rareza<input id="f-rarity" list="rarities" placeholder="Ultra Rare"></label>
+    </div>
+    <datalist id="sets"></datalist><datalist id="rarities"></datalist>
+    <div class="two">
+      <label>Cantidad<input id="f-qty" type="number" min="1" value="1" required></label>
+      <label>Estado
+        <select id="f-cond"><option>Mint</option><option selected>Near Mint</option><option>Excelente</option><option>Buena</option><option>Jugada</option><option>Mala</option></select>
+      </label>
+    </div>
+    <div class="field">
+      <span id="lang-lbl">Idioma</span>
+      <div class="lang" id="lang">
+        <button type="button" id="lang-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lang-lbl lang-btn"></button>
+        <ul id="lang-list" role="listbox" aria-labelledby="lang-lbl" hidden></ul>
+      </div>
+      <input type="hidden" id="f-lang">
+    </div>
+    <label>Etiquetas (separadas por comas)<input id="f-tags" placeholder="mazo mago, para cambiar"></label>
+    <label>Notas<textarea id="f-notes" rows="2"></textarea></label>
+    <p class="err" id="form-err" role="alert"></p>
+    <div class="actions">
+      <button type="button" class="btn alt" id="cancel">Cancelar</button>
+      <button class="btn">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const YGO = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
+const splitTags = t => String(t ?? '').split(',').map(x => x.trim()).filter(Boolean);
+const chips = t => splitTags(t).map(x => `<span class="tag">${esc(x)}</span>`).join('');
+// [código guardado en la BD, nombre, código de país para la bandera]
+const LANGS = [['EN', 'Inglés', 'gb'], ['ES', 'Español', 'es'], ['FR', 'Francés', 'fr'], ['DE', 'Alemán', 'de'], ['IT', 'Italiano', 'it'],
+               ['PT', 'Portugués', 'pt'], ['JP', 'Japonés', 'jp'], ['KR', 'Coreano', 'kr'], ['CN', 'Chino', 'cn']];
+const langOf = code => LANGS.find(l => l[0] === code);
+const flag = cc => `<img class="flag" src="https://flagcdn.com/w20/${cc}.png" srcset="https://flagcdn.com/w40/${cc}.png 2x" width="20" height="15" alt="" referrerpolicy="no-referrer">`;
+let cards = [], found = [], currentSets = [], draft = {}, detId = null;
+
+/* ---------- Llamadas a nuestro servidor (MySQL) ---------- */
+async function api(path, opts = {}) {
+  const r = await fetch('/api/cards' + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Error ${r.status}`);
+  return r.status === 204 ? null : r.json();
+}
+async function load() {
+  try { cards = await api(''); $('#inv-msg').textContent = ''; }
+  catch { $('#inv-msg').textContent = 'No se pudo conectar con el servidor. ¿Está arrancado con «npm start»?'; }
+  render();
+}
+
+/* ---------- Cuadrícula ---------- */
+function render() {
+  const f = $('#filter').value.trim().toLowerCase();
+  const list = cards.filter(c => [c.name, c.set_code, c.tags, c.language, langOf(c.language)?.[1]].join(' ').toLowerCase().includes(f));
+  $('#grid').innerHTML = list.map(c => `<button class="tile" data-id="${c.id}" aria-label="${esc(c.name)}, ${c.quantity} copias">
+    ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="ph">${esc(c.name)}</span>`}
+    <b class="qty">${c.quantity}</b></button>`).join('');
+  $('#s-rows').textContent = cards.length;
+  $('#s-copies').textContent = cards.reduce((n, c) => n + c.quantity, 0);
+  const tags = [...new Set(cards.flatMap(c => splitTags(c.tags)))].sort();
+  $('#all-tags').innerHTML = tags.map(t => `<option value="${esc(t)}">`).join('');
+  if (!list.length && !$('#inv-msg').textContent)
+    $('#grid').innerHTML = `<p class="empty">${cards.length ? 'Ninguna carta coincide con el filtro.' : 'Tu inventario está vacío. Busca una carta arriba y pulsa «Añadir».'}</p>`;
+}
+$('#filter').addEventListener('input', render);
+
+/* ---------- Detalle de una carta ---------- */
+function showDetail(id) {
+  const c = cards.find(x => x.id == id); if (!c) return;
+  detId = c.id;
+  const L = langOf(c.language);
+  const stats = c.atk != null || c.def_pts != null ? `${c.atk ?? '?'} / ${c.def_pts ?? '—'}` : '';
+  const rows = [['Tipo', c.type], ['Raza / subtipo', c.race], ['Atributo', c.attribute], ['Nivel', c.level], ['ATK / DEF', stats],
+    ['Set', c.set_code], ['Rareza', c.rarity], ['Idioma', L?.[1], L ? flag(L[2]) : ''], ['Estado', c.card_condition]].filter(([, v]) => v != null && v !== '');
+  $('#det-body').innerHTML = `
+    <div class="det-img">${c.image ? `<img src="${esc(c.image)}" alt="${esc(c.name)}" referrerpolicy="no-referrer">` : ''}</div>
+    <div class="det-info">
+      <h2>${esc(c.name)}</h2>
+      <dl>${rows.map(([k, v, raw]) => `<dt>${k}</dt><dd${raw ? ' class="lg"' : ''}>${raw ?? ''}${esc(v)}</dd>`).join('')}</dl>
+      ${c.tags ? `<div>${chips(c.tags)}</div>` : ''}
+      ${c.notes ? `<p class="note">${esc(c.notes)}</p>` : ''}
+      ${c.description ? `<p class="desc">${esc(c.description)}</p>` : ''}
+      <div class="actions">
+        <div class="step"><button class="btn alt sm" data-act="minus" aria-label="Quitar una copia" ${c.quantity <= 1 ? 'disabled' : ''}>−</button><b>${c.quantity}</b><button class="btn alt sm" data-act="plus" aria-label="Añadir una copia">+</button></div>
+        <button class="btn alt" data-act="edit">Editar</button>
+        <button class="btn danger" data-act="del">Borrar</button>
+        <button class="btn alt" data-act="close">Cerrar</button>
+      </div>
+    </div>`;
+  if (!$('#det').open) $('#det').showModal();
+}
+$('#grid').addEventListener('click', e => { const t = e.target.closest('.tile'); if (t) showDetail(t.dataset.id); });
+$('#det-body').addEventListener('click', async e => {
+  const act = e.target.dataset.act; if (!act) return;
+  const c = cards.find(x => x.id == detId);
+  try {
+    if (act === 'close') $('#det').close();
+    if (act === 'edit') { $('#det').close(); openDlg(c); }
+    if (act === 'del' && confirm('¿Borrar esta carta del inventario?')) { await api('/' + c.id, { method: 'DELETE' }); $('#det').close(); await load(); }
+    if (act === 'plus' || act === 'minus') {
+      await api('/' + c.id, { method: 'PUT', body: JSON.stringify({ quantity: c.quantity + (act === 'plus' ? 1 : -1) }) });
+      await load(); showDetail(c.id);
+    }
+  } catch (err) { alert(err.message); }
+});
+$('#det').addEventListener('click', e => { if (e.target === $('#det')) $('#det').close(); });
+
+/* ---------- Búsqueda en YGOPRODeck (automática al escribir) ---------- */
+let searchCtl = null, searchTimer = null;
+async function search(q) {
+  searchCtl?.abort();                       // cancela la petición anterior que siga en curso
+  const msg = $('#search-msg');
+  if (q.length < 2) { $('#results').innerHTML = ''; msg.textContent = q ? 'Escribe al menos 2 letras.' : ''; return; }
+  const ctl = searchCtl = new AbortController();
+  msg.textContent = 'Buscando…';
+  try {
+    const res = await fetch(`${YGO}?fname=${encodeURIComponent(q)}`, { signal: ctl.signal });
+    if (res.status === 400) { $('#results').innerHTML = ''; msg.textContent = 'No se encontraron cartas con ese nombre.'; return; }
+    if (!res.ok) throw new Error(res.status);
+    found = (await res.json()).data.slice(0, 30);
+    msg.textContent = `${found.length} resultado(s). Pulsa «Añadir» para guardar una carta en tu inventario.`;
+    $('#results').innerHTML = found.map((c, i) => {
+      const cls = /Spell/.test(c.type) ? 'spell' : /Trap/.test(c.type) ? 'trap' : '';
+      return `<div class="res ${cls}"><img src="${esc(c.card_images?.[0]?.image_url_small)}" alt="" loading="lazy" referrerpolicy="no-referrer">
+        <strong>${esc(c.name)}</strong><span>${esc(c.type)}</span>
+        <button class="btn sm" data-add="${i}">Añadir</button></div>`;
+    }).join('');
+  } catch (err) {
+    if (err.name === 'AbortError') return;  // la cancelamos nosotros: llega una búsqueda más reciente
+    msg.textContent = 'No se pudo consultar la API. Revisa tu conexión e inténtalo de nuevo.';
+  }
+}
+$('#q').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchCtl?.abort();
+  searchTimer = setTimeout(() => search($('#q').value.trim()), 300);   // espera a que dejes de escribir
+});
+$('#search-form').addEventListener('submit', e => { e.preventDefault(); clearTimeout(searchTimer); search($('#q').value.trim()); });
+$('#results').addEventListener('click', e => {
+  const i = e.target.dataset.add; if (i === undefined) return;
+  const c = found[i];
+  draft = { ygo_id: c.id, type: c.type, race: c.race, attribute: c.attribute, level: c.level, atk: c.atk, def_pts: c.def,
+            description: c.desc, image: c.card_images?.[0]?.image_url_small };
+  openDlg({ name: c.name }, c.card_sets || []);
+});
+
+/* ---------- Formulario (crear / editar) ---------- */
+function openDlg(d = {}, sets = []) {
+  if (d.id) draft = {};
+  currentSets = sets;
+  $('#dlg-title').textContent = d.id ? 'Editar carta' : 'Añadir carta';
+  $('#f-id').value = d.id ?? ''; $('#f-name').value = d.name ?? ''; $('#f-set').value = d.set_code ?? ''; $('#f-rarity').value = d.rarity ?? '';
+  $('#f-qty').value = d.quantity ?? 1; $('#f-cond').value = d.card_condition ?? 'Near Mint';
+  setLang(d.id ? d.language : 'EN'); closeList(false); $('#f-tags').value = d.tags ?? ''; $('#f-notes').value = d.notes ?? ''; $('#form-err').textContent = '';
+  $('#sets').innerHTML = [...new Set(sets.map(s => s.set_code))].map(v => `<option value="${esc(v)}">`).join('');
+  $('#rarities').innerHTML = [...new Set(sets.map(s => s.set_rarity))].map(v => `<option value="${esc(v)}">`).join('');
+  $('#dlg').showModal();
+}
+/* ---------- Selector de idioma con banderas ---------- */
+const langBtn = $('#lang-btn'), langList = $('#lang-list');
+langList.innerHTML = [['', 'Sin especificar', null], ...LANGS].map(([code, name, cc]) =>
+  `<li role="option" tabindex="-1" data-code="${code}">${cc ? flag(cc) : '<span class="flag"></span>'}<span>${name}</span></li>`).join('');
+function setLang(code) {
+  code = code || '';
+  const l = langOf(code);
+  $('#f-lang').value = code;
+  langBtn.innerHTML = l ? `${flag(l[2])}<span>${l[1]}</span>` : '<span class="flag"></span><span>Sin especificar</span>';
+  langList.querySelectorAll('li').forEach(li => li.setAttribute('aria-selected', li.dataset.code === code));
+}
+function openList() { langList.hidden = false; langBtn.setAttribute('aria-expanded', 'true'); (langList.querySelector('[aria-selected=true]') || langList.firstElementChild).focus(); }
+function closeList(focusBtn = true) { langList.hidden = true; langBtn.setAttribute('aria-expanded', 'false'); if (focusBtn) langBtn.focus(); }
+langBtn.addEventListener('click', () => langList.hidden ? openList() : closeList());
+langBtn.addEventListener('keydown', e => { if (e.key === 'ArrowDown' && langList.hidden) { e.preventDefault(); openList(); } });
+langList.addEventListener('click', e => { const li = e.target.closest('li'); if (li) { setLang(li.dataset.code); closeList(); } });
+langList.addEventListener('keydown', e => {
+  const li = e.target.closest('li'); if (!li) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); li.nextElementSibling?.focus(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); li.previousElementSibling?.focus(); }
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setLang(li.dataset.code); closeList(); }
+  if (e.key === 'Tab') closeList(false);
+});
+document.addEventListener('click', e => { if (!langList.hidden && !e.target.closest('#lang')) closeList(false); });
+$('#dlg').addEventListener('cancel', e => { if (!langList.hidden) { e.preventDefault(); closeList(); } });
+
+$('#f-set').addEventListener('input', e => {
+  const s = currentSets.find(s => s.set_code === e.target.value);
+  if (s) $('#f-rarity').value = s.set_rarity;
+});
+$('#cancel').onclick = () => $('#dlg').close();
+$('#new').onclick = () => { draft = {}; openDlg(); };
+$('#card-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = id => $(id).value.trim(), id = v('#f-id');
+  const body = { name: v('#f-name'), set_code: v('#f-set'), rarity: v('#f-rarity'), quantity: parseInt($('#f-qty').value) || 1,
+                 card_condition: $('#f-cond').value, language: $('#f-lang').value, tags: splitTags($('#f-tags').value).join(', '), notes: v('#f-notes') };
+  try {
+    if (id) await api('/' + id, { method: 'PUT', body: JSON.stringify(body) });
+    else { await api('', { method: 'POST', body: JSON.stringify({ ...draft, ...body }) }); $('#search-msg').textContent = `«${body.name}» añadida al inventario.`; }
+    $('#dlg').close(); await load();
+  } catch (err) { $('#form-err').textContent = err.message; }
+});
+
+/* ---------- Exportar / importar ---------- */
+let importList = null;
+$('#import').onclick = () => $('#file').click();
+/* Convierte cada formato en una lista de cartas; después todo pasa por el mismo diálogo y el mismo endpoint */
+const ALIASES = { nombre: 'name', set: 'set_code', codigo: 'set_code', código: 'set_code', rareza: 'rarity', idioma: 'language',
+  cantidad: 'quantity', qty: 'quantity', condition: 'card_condition', estado: 'card_condition', etiquetas: 'tags', notas: 'notes', id: 'ygo_id', passcode: 'ygo_id' };
+const FIELDS = ['name', 'set_code', 'rarity', 'language', 'quantity', 'card_condition', 'tags', 'notes', 'ygo_id', 'type', 'race',
+  'attribute', 'level', 'atk', 'def_pts', 'image', 'description'];
+
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const sep = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ';' : ',';   // detecta ; o ,
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+function csvToCards(text) {
+  const [head, ...rows] = parseCsv(text);
+  if (!head) return [];
+  const keys = head.map(h => { const k = h.trim().toLowerCase(); return FIELDS.includes(k) ? k : ALIASES[k]; });
+  return rows.map(r => {
+    const c = {};
+    keys.forEach((k, i) => { if (k && r[i] !== undefined && r[i] !== '') c[k] = r[i]; });
+    c.quantity = parseInt(c.quantity) || 1;
+    const l = LANGS.find(x => x[0] === String(c.language).toUpperCase() || x[1].toLowerCase() === String(c.language).toLowerCase());
+    if (l) c.language = l[0]; else delete c.language;
+    return c;
+  });
+}
+async function ydkToCards(text) {
+  const counts = new Map();                                    // un YDK es una línea con el ID por cada copia
+  for (const l of text.split(/\r?\n/)) { const t = l.trim(); if (/^\d+$/.test(t)) counts.set(t, (counts.get(t) || 0) + 1); }
+  const ids = [...counts.keys()], byId = new Map();
+  try {
+    for (let i = 0; i < ids.length; i += 40) {
+      const res = await fetch(`${YGO}?id=${ids.slice(i, i + 40).join(',')}`);
+      if (res.status === 400) continue;
+      if (!res.ok) throw new Error(res.status);
+      for (const c of (await res.json()).data) { byId.set(String(c.id), c); c.card_images?.forEach(im => byId.set(String(im.id), c)); }
+    }
+  } catch { throw new Error('No se pudo consultar YGOPRODeck para leer el mazo. Revisa tu conexión.'); }
+  const merged = new Map(); let missing = 0;
+  for (const [id, n] of counts) {
+    const c = byId.get(id);
+    if (!c) { missing++; continue; }
+    merged.set(c, (merged.get(c) || 0) + n);
+  }
+  const list = [...merged].map(([c, n]) => ({ name: c.name, ygo_id: c.id, type: c.type, race: c.race, attribute: c.attribute, level: c.level,
+    atk: c.atk, def_pts: c.def, description: c.desc, image: c.card_images?.[0]?.image_url_small, quantity: n }));
+  return { list, missing };
+}
+$('#file').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const btn = $('#import'), ext = f.name.split('.').pop().toLowerCase();
+  btn.disabled = true; btn.textContent = 'Leyendo…';
+  try {
+    const text = await f.text();
+    let list, note = '';
+    if (ext === 'json') { const d = JSON.parse(text); list = Array.isArray(d) ? d : d.cards; }
+    else if (ext === 'csv') list = csvToCards(text);
+    else if (ext === 'ydk') { const r = await ydkToCards(text); list = r.list; if (r.missing) note = ` ${r.missing} ID(s) del mazo no se encontraron en YGOPRODeck y se omitirán.`; }
+    else throw new Error('Formato no admitido. Usa un archivo .json, .csv o .ydk.');
+    if (!Array.isArray(list) || !list.length) throw new Error('No se encontraron cartas en el archivo.');
+    importList = list;
+    const copies = list.reduce((n, c) => n + (parseInt(c.quantity) || 1), 0);
+    $('#imp-text').textContent = `${f.name} contiene ${list.length} carta(s) distintas (${copies} copias) y tu inventario actual tiene ${cards.length}. ¿Quieres añadirlas a lo que ya tienes o reemplazar todo el inventario por el contenido del archivo?${note}`;
+    $('#imp-err').textContent = '';
+    $('#imp').showModal();
+  } catch (err) { alert(err instanceof SyntaxError ? 'El archivo JSON no es válido.' : err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Importar'; }
+});
+document.addEventListener('click', e => {
+  const m = $('#exp');
+  if (m.open && (!m.contains(e.target) || e.target.closest('a'))) setTimeout(() => m.open = false);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#exp').open = false; });
+$('#imp-cancel').onclick = () => $('#imp').close();
+$('#imp-form').addEventListener('click', async e => {
+  const mode = e.target.dataset.mode; if (!mode) return;
+  if (mode === 'replace' && cards.length && !confirm(`Se borrarán las ${cards.length} entradas actuales. ¿Continuar?`)) return;
+  try {
+    const r = await fetch('/api/import?mode=' + mode, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cards: importList }) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.error || `Error ${r.status}`);
+    $('#imp').close(); await load();
+    $('#inv-msg').textContent = `Importadas ${out.imported} carta(s)` + (out.skipped ? `; ${out.skipped} omitidas por datos no válidos.` : '.');
+  } catch (err) { $('#imp-err').textContent = err.message; }
+});
+
+load();
+</script>
+</body>
+</html>
