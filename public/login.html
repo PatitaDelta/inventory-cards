@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · Inventario Yu-Gi-Oh!</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#0e111d;--panel:#171b2e;--field:#0e111d;--ink:#e7eaf6;--muted:#9ba4c6;--line:#2b3253;--gold:#d9a83a;--accent:#4f61d6;--danger:#ff8a86}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;padding:16px}
+form{width:min(380px,100%);background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:12px;padding:28px;display:grid;gap:14px}
+h1{margin:0;font:700 1.6rem/1.2 "Barlow Semi Condensed",sans-serif}
+p{margin:0;color:var(--muted)}
+label{color:var(--muted);font-size:.9rem}
+input{width:100%;font:inherit;color:inherit;padding:10px 12px;margin-top:4px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+input:focus-visible,button:focus-visible{outline:3px solid #8fa0e8;outline-offset:1px}
+button{cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:10px 16px;border-radius:6px;font:600 1rem "Barlow Semi Condensed",sans-serif}
+button:disabled{opacity:.5;cursor:default}
+.err{color:var(--danger);min-height:1.4em;margin:0}
+</style>
+</head>
+<body>
+<form id="f">
+  <h1>Inventario de cartas Yu-Gi-Oh!</h1>
+  <p>Introduce tu contraseña para entrar.</p>
+  <div>
+    <label for="p">Contraseña</label>
+    <input id="p" type="password" autocomplete="current-password" required autofocus>
+  </div>
+  <p class="err" id="err" role="alert"></p>
+  <button id="go">Entrar</button>
+</form>
+<script>
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = document.getElementById('err'), go = document.getElementById('go');
+  err.textContent = ''; go.disabled = true;
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: document.getElementById('p').value }) });
+    if (r.ok) { location.href = '/'; return; }
+    err.textContent = (await r.json().catch(() => ({}))).error || 'No se pudo iniciar sesión.';
+  } catch { err.textContent = 'No se pudo conectar con el servidor.'; }
+  go.disabled = false;
+  document.getElementById('p').select();
+});
+</script>
+</body>
+</html>

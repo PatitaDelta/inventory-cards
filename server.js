@@ -2,11 +2,18 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const path = require('path');
+const crypto = require('crypto');
 
 const DB = process.env.DB_NAME || 'inventario_ygo';
 const PORT = Number(process.env.PORT) || 3000;
 // En local escucha solo en 127.0.0.1. Dentro de Docker hay que poner HOST=0.0.0.0, si no el puerto publicado no llega a la app.
 const HOST = process.env.HOST || '127.0.0.1';
+const APP_PASSWORD = process.env.APP_PASSWORD || '';
+if (!APP_PASSWORD) {
+  console.error('Falta APP_PASSWORD: defínela en .env o en docker-compose para activar el login.');
+  process.exit(1);
+}
+if (APP_PASSWORD.length < 8) console.warn('Aviso: APP_PASSWORD es corta. Usa al menos 8 caracteres.');
 const conn = {
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT) || 3306,
@@ -75,6 +82,52 @@ async function init() {
 
 const app = express();
 const h = fn => (req, res, next) => fn(req, res).catch(next);
+
+/* ---------- Login (un solo usuario, contraseña en APP_PASSWORD) ---------- */
+// Si no defines SESSION_SECRET, se genera uno al arrancar: al reiniciar el servidor tendrás que volver a entrar.
+const SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const fails = new Map();                                        // intentos fallidos por IP
+
+const sha = s => crypto.createHash('sha256').update(String(s)).digest();
+const okPass = p => crypto.timingSafeEqual(sha(p), sha(APP_PASSWORD));
+const sign = v => crypto.createHmac('sha256', SECRET).update(v).digest('hex');
+const newToken = () => { const exp = String(Date.now() + SESSION_MS); return `${exp}.${sign(exp)}`; };
+const cookies = req => Object.fromEntries((req.headers.cookie || '').split(';')
+  .map(c => c.trim().split(/=(.*)/s).slice(0, 2)).filter(([k]) => k));
+function validSession(req) {
+  const [exp, sig] = String(cookies(req).session || '').split('.');
+  if (!exp || !sig || !(Number(exp) > Date.now())) return false;
+  const a = Buffer.from(sig), b = Buffer.from(sign(exp));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function setCookie(req, res, value, maxAgeSeconds) {
+  const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+  res.set('Set-Cookie', `session=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSeconds}${secure}`);
+}
+
+app.get('/login', (req, res) => validSession(req) ? res.redirect('/') : res.sendFile(path.join(__dirname, 'public', 'login.html')));
+app.post('/api/login', express.json({ limit: '1kb' }), (req, res) => {
+  const f = fails.get(req.ip);
+  if (f?.until > Date.now()) return res.status(429).json({ error: 'Demasiados intentos. Espera unos minutos.' });
+  if (!okPass(req.body?.password ?? '')) {
+    if (fails.size > 1000) fails.clear();
+    const n = (f?.n || 0) + 1;
+    fails.set(req.ip, n >= 5 ? { n: 0, until: Date.now() + 15 * 60 * 1000 } : { n });   // 5 fallos = 15 min bloqueado
+    return res.status(401).json({ error: 'Contraseña incorrecta.' });
+  }
+  fails.delete(req.ip);
+  setCookie(req, res, newToken(), SESSION_MS / 1000);
+  res.json({ ok: true });
+});
+app.post('/api/logout', (req, res) => { setCookie(req, res, '', 0); res.json({ ok: true }); });
+
+// Todo lo que viene después exige sesión
+app.use((req, res, next) => {
+  if (validSession(req)) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Sesión caducada. Vuelve a entrar.' });
+  res.redirect('/login');
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
