@@ -49,6 +49,17 @@ a.btn{display:inline-block;text-decoration:none;line-height:normal}
 .tile img{width:100%;height:100%;object-fit:cover;display:block}
 .ph{display:grid;place-items:center;height:100%;padding:10px;text-align:center;font-weight:600;color:var(--muted)}
 .qty{position:absolute;right:6px;bottom:6px;min-width:30px;height:30px;padding:0 8px;border-radius:999px;background:#0a0c16ee;color:var(--gold);border:2px solid var(--gold);display:grid;place-items:center;font-weight:700;font-size:1rem}
+.listbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 20px}
+.listbar label{display:block;color:var(--ink);font-weight:600;font-size:1rem}
+.listbar .msg{margin:0;min-height:0}
+.thumb{position:relative}
+.thumb img{display:block}
+.lb{position:absolute;top:6px;right:6px;min-width:28px;height:28px;padding:0 7px;border-radius:999px;display:grid;place-items:center;font:700 .95rem "Barlow Semi Condensed",sans-serif;border:2px solid #0a0c16;box-shadow:0 1px 4px #000a;white-space:nowrap}
+.ban0{background:#c62828;color:#fff}
+.ban1{background:#f5a524;color:#1a1200}
+.ban2{background:#f2d94e;color:#1a1500}
+.pts{background:var(--accent);color:#fff;border-radius:8px;font-size:.85rem}
+#list-legend .lb{position:static;display:inline-grid;vertical-align:middle;margin-right:6px;min-width:24px;height:24px}
 .tag{display:inline-block;background:#252c4d;color:var(--link);border-radius:999px;padding:1px 10px;font-size:.82rem;margin:2px 4px 2px 0}
 .empty{color:var(--muted);padding:12px 0 0}
 /* Diálogos */
@@ -106,6 +117,11 @@ dt{color:var(--muted)}dd{margin:0}
   </div>
 </header>
 <main>
+  <section class="listbar">
+    <label for="list-sel">Lista activa</label>
+    <select id="list-sel"></select>
+    <p class="msg" id="list-legend"></p>
+  </section>
   <section>
     <h2>Buscar en YGOPRODeck</h2>
     <form class="row" id="search-form">
@@ -201,15 +217,16 @@ async function load() {
   try { cards = await api(''); $('#inv-msg').textContent = ''; }
   catch { $('#inv-msg').textContent = 'No se pudo conectar con el servidor. ¿Está arrancado con «npm start»?'; }
   render();
+  ensureList(cards.map(c => c.ygo_id));
 }
 
 /* ---------- Cuadrícula ---------- */
 function render() {
   const f = $('#filter').value.trim().toLowerCase();
   const list = cards.filter(c => [c.name, c.set_code, c.tags, c.language, langOf(c.language)?.[1]].join(' ').toLowerCase().includes(f));
-  $('#grid').innerHTML = list.map(c => `<button class="tile" data-id="${c.id}" aria-label="${esc(c.name)}, ${c.quantity} copias">
+  $('#grid').innerHTML = list.map(c => `<button class="tile" data-id="${c.id}" aria-label="${esc(c.name)}, ${c.quantity} copias${listText(c.ygo_id) ? ', ' + listText(c.ygo_id) : ''}">
     ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="ph">${esc(c.name)}</span>`}
-    <b class="qty">${c.quantity}</b></button>`).join('');
+    ${badge(c.ygo_id)}<b class="qty">${c.quantity}</b></button>`).join('');
   $('#s-rows').textContent = cards.length;
   $('#s-copies').textContent = cards.reduce((n, c) => n + c.quantity, 0);
   const tags = [...new Set(cards.flatMap(c => splitTags(c.tags)))].sort();
@@ -225,7 +242,7 @@ function showDetail(id) {
   detId = c.id;
   const L = langOf(c.language);
   const stats = c.atk != null || c.def_pts != null ? `${c.atk ?? '?'} / ${c.def_pts ?? '—'}` : '';
-  const rows = [['Tipo', c.type], ['Raza / subtipo', c.race], ['Atributo', c.attribute], ['Nivel', c.level], ['ATK / DEF', stats],
+  const rows = [['Tipo', c.type], ['Raza / subtipo', c.race], ['Atributo', c.attribute], ['Nivel', c.level], ['ATK / DEF', stats], [LISTS.find(l => l[0] === listMode)?.[1] ?? '', listText(c.ygo_id, true)],
     ['Set', c.set_code], ['Rareza', c.rarity], ['Idioma', L?.[1], L ? flag(L[2]) : ''], ['Estado', c.card_condition]].filter(([, v]) => v != null && v !== '');
   $('#det-body').innerHTML = `
     <div class="det-img">${c.image ? `<img src="${esc(c.image)}" alt="${esc(c.name)}" referrerpolicy="no-referrer">` : ''}</div>
@@ -265,21 +282,18 @@ let searchCtl = null, searchTimer = null;
 async function search(q) {
   searchCtl?.abort();                       // cancela la petición anterior que siga en curso
   const msg = $('#search-msg');
-  if (q.length < 2) { $('#results').innerHTML = ''; msg.textContent = q ? 'Escribe al menos 2 letras.' : ''; return; }
+  if (q.length < 2) { found = []; $('#results').innerHTML = ''; msg.textContent = q ? 'Escribe al menos 2 letras.' : ''; return; }
   const ctl = searchCtl = new AbortController();
   msg.textContent = 'Buscando…';
   try {
     const res = await fetch(`${YGO}?fname=${encodeURIComponent(q)}`, { signal: ctl.signal });
-    if (res.status === 400) { $('#results').innerHTML = ''; msg.textContent = 'No se encontraron cartas con ese nombre.'; return; }
+    if (res.status === 400) { found = []; $('#results').innerHTML = ''; msg.textContent = 'No se encontraron cartas con ese nombre.'; return; }
     if (!res.ok) throw new Error(res.status);
     found = (await res.json()).data.slice(0, 30);
     msg.textContent = `${found.length} resultado(s). Pulsa «Añadir» para guardar una carta en tu inventario.`;
-    $('#results').innerHTML = found.map((c, i) => {
-      const cls = /Spell/.test(c.type) ? 'spell' : /Trap/.test(c.type) ? 'trap' : '';
-      return `<div class="res ${cls}"><img src="${esc(c.card_images?.[0]?.image_url_small)}" alt="" loading="lazy" referrerpolicy="no-referrer">
-        <strong>${esc(c.name)}</strong><span>${esc(c.type)}</span>
-        <button class="btn sm" data-add="${i}">Añadir</button></div>`;
-    }).join('');
+    absorb(found);
+    renderResults();
+    ensureList(found.map(c => c.id));
   } catch (err) {
     if (err.name === 'AbortError') return;  // la cancelamos nosotros: llega una búsqueda más reciente
     msg.textContent = 'No se pudo consultar la API. Revisa tu conexión e inténtalo de nuevo.';
@@ -454,6 +468,90 @@ $('#imp-form').addEventListener('click', async e => {
     $('#imp').close(); await load();
     $('#inv-msg').textContent = `Importadas ${out.imported} carta(s)` + (out.skipped ? `; ${out.skipped} omitidas por datos no válidos.` : '.');
   } catch (err) { $('#imp-err').textContent = err.message; }
+});
+
+/* ---------- Lista activa: prohibidas (TCG / OCG / GOAT) o puntos Genesys ---------- */
+const LISTS = [['', 'Sin lista'], ['tcg', 'Prohibidas TCG'], ['ocg', 'Prohibidas OCG'], ['goat', 'Prohibidas GOAT'],
+               ['genesys', 'Genesys (TCG)'], ['genesys ocg', 'Genesys (OCG)']];
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let listMode = lsGet('ygo-list', '');
+if (!LISTS.some(l => l[0] === listMode)) listMode = '';
+const listCache = lsGet('ygo-list-cache', {});     // { modo: { ts, data: { idCarta: valor } } }, se renueva cada 12 h
+const isGenesys = m => m.startsWith('genesys');
+const BAN_NAMES = ['Prohibida', 'Limitada', 'Semi-limitada'];
+const banLevel = s => { s = String(s || '').toLowerCase(); return !s ? null : s.includes('semi') ? 2 : s.includes('limit') ? 1 : 0; };
+function bucket(mode) {
+  const b = listCache[mode];
+  if (!b || Date.now() - b.ts > 12 * 3600 * 1000) listCache[mode] = { ts: Date.now(), data: {} };
+  return listCache[mode];
+}
+// Valor guardado: ban → 'Banned' | 'Limited' | 'Semi-Limited' | '' (sin restricción); genesys → puntos, o -1 si no existe en el formato
+const listValue = id => (listMode && id != null) ? bucket(listMode).data[String(id)] : undefined;
+function listText(id, full = false) {
+  const v = listValue(id);
+  if (v === undefined) return '';
+  if (isGenesys(listMode)) return v < 0 ? (full ? 'No disponible en este formato' : '') : v > 0 ? `${v} puntos` : (full ? '0 puntos' : '');
+  const l = banLevel(v);
+  return l === null ? (full ? 'Sin restricción' : '') : BAN_NAMES[l];
+}
+function badge(id) {
+  const v = listValue(id);
+  if (v === undefined) return '';
+  if (isGenesys(listMode)) return v > 0 ? `<b class="lb pts" title="${v} puntos Genesys" aria-hidden="true">${v} pts</b>` : '';
+  const l = banLevel(v);
+  return l === null ? '' : `<b class="lb ban${l}" title="${BAN_NAMES[l]}" aria-hidden="true">${l}</b>`;
+}
+// Las búsquedas ya traen banlist_info, así que para las prohibidas no hace falta otra petición
+function absorb(list) {
+  if (!listMode || isGenesys(listMode)) return;
+  const d = bucket(listMode).data;
+  for (const c of list) d[String(c.id)] = c.banlist_info?.['ban_' + listMode] ?? '';
+}
+async function ensureList(ids) {
+  const mode = listMode;
+  if (!mode) return;
+  const d = bucket(mode).data;
+  const need = [...new Set(ids.filter(Boolean).map(String))].filter(id => !(id in d));
+  const field = mode === 'genesys' ? 'genesys_points' : 'genesys_ocg_points';
+  for (let i = 0; i < need.length; i += 40) {
+    const chunk = need.slice(i, i + 40), got = new Map();
+    try {
+      const res = await fetch(`${YGO}?id=${chunk.join(',')}` + (isGenesys(mode) ? `&misc=yes&format=${encodeURIComponent(mode)}` : ''));
+      if (res.ok) for (const c of (await res.json()).data) got.set(String(c.id), c);
+      else if (res.status !== 400) return;      // error del servidor: se reintentará más tarde
+    } catch { return; }                         // sin conexión
+    for (const id of chunk) {
+      const c = got.get(id);
+      d[id] = isGenesys(mode) ? (c ? Number(c.misc_info?.[0]?.[field] ?? c[field]) || 0 : -1)
+                              : (c?.banlist_info?.['ban_' + mode] ?? '');
+    }
+  }
+  lsSet('ygo-list-cache', listCache);
+  if (mode === listMode) { render(); renderResults(); }
+}
+function renderResults() {
+  $('#results').innerHTML = found.map((c, i) => {
+    const cls = /Spell/.test(c.type) ? 'spell' : /Trap/.test(c.type) ? 'trap' : '';
+    const st = listText(c.id);
+    return `<div class="res ${cls}"><div class="thumb"><img src="${esc(c.card_images?.[0]?.image_url_small)}" alt="" loading="lazy" referrerpolicy="no-referrer">${badge(c.id)}</div>
+      <strong>${esc(c.name)}</strong><span>${esc(c.type)}${st ? ' · ' + esc(st) : ''}</span>
+      <button class="btn sm" data-add="${i}">Añadir</button></div>`;
+  }).join('');
+}
+function updateLegend() {
+  $('#list-legend').innerHTML = !listMode
+    ? 'Elige una lista para ver en la esquina superior derecha de cada carta si está prohibida, limitada o semi-limitada, o cuántos puntos Genesys cuesta.'
+    : isGenesys(listMode) ? 'Insignia: puntos Genesys de cada carta (solo las que cuestan más de 0).'
+    : '<span class="lb ban0">0</span>Prohibida &nbsp; <span class="lb ban1">1</span>Limitada &nbsp; <span class="lb ban2">2</span>Semi-limitada';
+}
+$('#list-sel').innerHTML = LISTS.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
+$('#list-sel').value = listMode;
+updateLegend();
+$('#list-sel').addEventListener('change', e => {
+  listMode = e.target.value; lsSet('ygo-list', listMode); updateLegend();
+  absorb(found); render(); renderResults();
+  ensureList([...cards.map(c => c.ygo_id), ...found.map(c => c.id)]);
 });
 
 $('#logout').onclick = async () => { await fetch('/api/logout', { method: 'POST' }); location.href = '/login'; };

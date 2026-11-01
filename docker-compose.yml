@@ -27,7 +27,7 @@ services:
       - "127.0.0.1:3000:3000"
     environment:
       - HOST=0.0.0.0
-      - APP_PASSWORD=pon_aqui_una_contraseña_larga
+      - APP_PASSWORD=lacontraseña
       - DB_HOST=db
       - DB_PORT=3306
       - DB_USER=root
