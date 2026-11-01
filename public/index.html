@@ -15,7 +15,20 @@ header{background:#0a0c16;color:#fff;padding:20px 24px;display:flex;flex-wrap:wr
 h1{margin:0;font-size:1.7rem}
 .stats{display:flex;gap:20px;color:#c9d0e6}
 .stats b{color:#fff;font-size:1.3rem;margin-right:4px}
-main{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+[hidden]{display:none!important}
+.layout{max-width:1380px;margin:0 auto;padding:24px 16px 60px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:24px;align-items:start}
+main{min-width:0}
+.sidebar{position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.sidebar h2{font-size:1.1rem;margin:0 0 10px}
+.sidebar ul{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.tagbtn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;text-align:left;font:inherit;color:var(--ink);background:transparent;border:1px solid transparent;border-radius:6px;padding:6px 10px;cursor:pointer}
+.tagbtn span{overflow-wrap:anywhere}
+.tagbtn:hover{background:#252c4d}
+.tagbtn[aria-pressed=true]{background:#252c4d;border-color:var(--gold);color:var(--gold)}
+.tagbtn b{font-family:"Barlow Semi Condensed",sans-serif;font-weight:600;color:var(--muted)}
+.tagbtn[aria-pressed=true] b{color:var(--gold)}
+.tagbtn:focus-visible{outline:3px solid #8fa0e8;outline-offset:1px}
+@media (max-width:820px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-height:240px}}
 section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:24px}
 h2{margin:0 0 14px;font-size:1.3rem}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -116,6 +129,11 @@ dt{color:var(--muted)}dd{margin:0}
     <button class="btn alt" id="logout">Salir</button>
   </div>
 </header>
+<div class="layout">
+<aside class="sidebar" aria-labelledby="tags-h">
+  <h2 id="tags-h">Etiquetas</h2>
+  <ul id="tag-list"></ul>
+</aside>
 <main>
   <section class="listbar">
     <label for="list-sel">Lista activa</label>
@@ -139,10 +157,15 @@ dt{color:var(--muted)}dd{margin:0}
       <datalist id="all-tags"></datalist>
       <button class="btn" id="new">Añadir manualmente</button>
     </div>
+    <div class="row" id="active-tag" hidden style="margin-top:10px">
+      <span>Etiqueta:</span><span class="tag" id="active-tag-name"></span>
+      <button class="btn alt sm" id="clear-tag">Quitar filtro</button>
+    </div>
     <p class="msg" id="inv-msg"></p>
     <div id="grid"></div>
   </section>
 </main>
+</div>
 
 <dialog id="imp">
   <form method="dialog" id="imp-form">
@@ -204,7 +227,7 @@ const LANGS = [['EN', 'Inglés', 'gb'], ['ES', 'Español', 'es'], ['FR', 'Franc�
                ['PT', 'Portugués', 'pt'], ['JP', 'Japonés', 'jp'], ['KR', 'Coreano', 'kr'], ['CN', 'Chino', 'cn']];
 const langOf = code => LANGS.find(l => l[0] === code);
 const flag = cc => `<img class="flag" src="https://flagcdn.com/w20/${cc}.png" srcset="https://flagcdn.com/w40/${cc}.png 2x" width="20" height="15" alt="" referrerpolicy="no-referrer">`;
-let cards = [], found = [], currentSets = [], draft = {}, detId = null;
+let cards = [], found = [], currentSets = [], draft = {}, detId = null, activeTag = '';
 
 /* ---------- Llamadas a nuestro servidor (MySQL) ---------- */
 async function api(path, opts = {}) {
@@ -222,8 +245,12 @@ async function load() {
 
 /* ---------- Cuadrícula ---------- */
 function render() {
+  const stats = tagStats();
+  if (activeTag && !stats.some(([k]) => k === activeTag)) activeTag = '';   // la etiqueta ya no existe en ninguna carta
+  renderTags(stats);
   const f = $('#filter').value.trim().toLowerCase();
-  const list = cards.filter(c => [c.name, c.set_code, c.tags, c.language, langOf(c.language)?.[1]].join(' ').toLowerCase().includes(f));
+  const list = cards.filter(c => [c.name, c.set_code, c.tags, c.language, langOf(c.language)?.[1]].join(' ').toLowerCase().includes(f)
+    && (!activeTag || splitTags(c.tags).some(t => t.toLowerCase() === activeTag)));
   $('#grid').innerHTML = list.map(c => `<button class="tile" data-id="${c.id}" aria-label="${esc(c.name)}, ${c.quantity} copias${listText(c.ygo_id) ? ', ' + listText(c.ygo_id) : ''}">
     ${c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<span class="ph">${esc(c.name)}</span>`}
     ${badge(c.ygo_id)}<b class="qty">${c.quantity}</b></button>`).join('');
@@ -469,6 +496,37 @@ $('#imp-form').addEventListener('click', async e => {
     $('#inv-msg').textContent = `Importadas ${out.imported} carta(s)` + (out.skipped ? `; ${out.skipped} omitidas por datos no válidos.` : '.');
   } catch (err) { $('#imp-err').textContent = err.message; }
 });
+
+/* ---------- Barra lateral de etiquetas (sale de las cartas guardadas en la BD) ---------- */
+function tagStats() {
+  const m = new Map();                                        // clave en minúsculas → { name, n }
+  for (const c of cards) {
+    const seen = new Set();
+    for (const t of splitTags(c.tags)) {
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const e = m.get(k);
+      if (e) e.n++; else m.set(k, { name: t, n: 1 });
+    }
+  }
+  return [...m].sort((a, b) => a[1].name.localeCompare(b[1].name, 'es'));
+}
+function renderTags(stats) {
+  const all = `<li><button class="tagbtn" data-tag="" aria-pressed="${!activeTag}"><span>Todas</span><b>${cards.length}</b></button></li>`;
+  $('#tag-list').innerHTML = stats.length
+    ? all + stats.map(([k, e]) => `<li><button class="tagbtn" data-tag="${esc(k)}" aria-pressed="${k === activeTag}"><span>${esc(e.name)}</span><b>${e.n}</b></button></li>`).join('')
+    : '<li class="empty">Aún no hay etiquetas. Añádelas al crear o editar una carta.</li>';
+  $('#active-tag').hidden = !activeTag;
+  if (activeTag) $('#active-tag-name').textContent = stats.find(([k]) => k === activeTag)?.[1].name ?? activeTag;
+}
+$('#tag-list').addEventListener('click', e => {
+  const b = e.target.closest('.tagbtn'); if (!b) return;
+  const k = b.dataset.tag;
+  activeTag = k === activeTag ? '' : k;                       // pulsar la etiqueta activa quita el filtro
+  render();
+});
+$('#clear-tag').onclick = () => { activeTag = ''; render(); };
 
 /* ---------- Lista activa: prohibidas (TCG / OCG / GOAT) o puntos Genesys ---------- */
 const LISTS = [['', 'Sin lista'], ['tcg', 'Prohibidas TCG'], ['ocg', 'Prohibidas OCG'], ['goat', 'Prohibidas GOAT'],

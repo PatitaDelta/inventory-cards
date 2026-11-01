@@ -7,6 +7,7 @@ Aplicación web para llevar el inventario de tu colección de cartas. Busca las 
 
 - Inventario en cuadrícula con la imagen de cada carta y su cantidad; al pulsar se ve la ficha completa.
 - Búsqueda automática en YGOPRODeck mientras escribes.
+- Barra lateral con todas tus etiquetas y su contador; al pulsar una se filtra el inventario.
 - Idioma de la carta (con banderas), rareza, set, estado y etiquetas propias.
 - Exportar e importar en **JSON**, **CSV** y **YDK**.
 - Lista activa: insignia en la esquina de cada carta con su estado en la lista de prohibidas (TCG, OCG o GOAT) o sus puntos Genesys. Los datos se consultan a YGOPRODeck y se guardan 12 h en el navegador.
